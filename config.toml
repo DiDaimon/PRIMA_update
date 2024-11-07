@@ -1,0 +1,8 @@
+# Данный конфиг имеет структуру TOML
+[Dirs]
+    Server= '\\tserver1\RSU\PRIMA'
+    Local = 'D:\User\PRIMA_Updated'
+
+[Ignores]
+    files = ['PRIMA.ini', 'Servers.ini', 'DTConfig.stc', 'DebugTranslate.log', 'PRIMA.ethl.log', 'PRIMA.mport.log']
+    dirs = ['tract']
