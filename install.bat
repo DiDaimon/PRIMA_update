@@ -7,7 +7,7 @@ set VENV_DIR=.venv
 mkdir .tmp 2>NUL
 set TMP=.tmp
 
-xcopy /y "graphPRIMA.lnk" "%USERPROFILE%\Desktop"
+xcopy /y "[PRIMA] 00.00.00.lnk" "%USERPROFILE%\Desktop"
 
 %PYTHON% -c "" >%TMP%/stdout.txt 2>%TMP%/stderr.txt
 if %ERRORLEVEL% == 0 goto :check_pip

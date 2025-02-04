@@ -1,3 +1,7 @@
+@echo off
+
+pushd %~dp0
+
 set TMP=.tmp
 set VENV_DIR=.venv
 set PYTHON="%VENV_DIR%\Scripts\Python.exe"
