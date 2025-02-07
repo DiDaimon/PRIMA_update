@@ -1,13 +1,6 @@
 # -*- coding: utf-8 -*-
 """Программа выполняет обновление PRIMA с сервера.
-
-
-
-Version:
-    1.0
-    1.1 Рефакторинг кода, добавление комментариев.
 TODO:
-    * Переписать конфигурацию на конфиг TOML.
     * Добавить проверку доступности сервера.
     * Добавить проверку наличия ярлыка на рабочем столе.
 
@@ -57,15 +50,47 @@ def update_lnk():
         FileNotFoundError: If the PRIMA executable file is not found in the source directory.
     """
     path = os.path.expanduser('~\\Desktop\\')
-    date_change = os.path.getmtime(os.path.join(DIR_SOURCE, 'PRIMA.exe'))
+    date_change = os.path.getmtime(os.path.join(DIR_DESTINATION, 'PRIMA.exe'))
     new_date = datetime.fromtimestamp(date_change).strftime('%d.%m.%y')
     for file in os.listdir(path):
         if '[PRIMA]' in file:
             old_name = file
-            os.rename(os.path.join(path, old_name), os.path.join(path, f'[PRIMA] {new_date}.lnk'))
-            print(f'{MESSAGE_OK}Ярлык на Рабочем столе изменен на [PRIMA] {new_date}')
-            return
+            if new_date in old_name:
+                return
+            else:
+                os.rename(os.path.join(path, old_name), os.path.join(path, f'[PRIMA] {new_date}.lnk'))
+                print(f'{MESSAGE_OK}Ярлык на Рабочем столе изменен на [PRIMA] {new_date}')
+                return
     print(f'{MESSAGE_FAILED}Ярлык на рабочем столе не найден')
+
+
+def backup_prima_exe():
+    prima_exe_path = os.path.join(DIR_DESTINATION, 'PRIMA.exe')  # Путь к файлу PRIMA.exe
+    if not os.path.exists(prima_exe_path):
+        print(f'{MESSAGE_FAILED}Файл PRIMA.exe не найден в целевой директории.')
+        return
+
+    # Получаем дату изменения файла
+    date_change = os.path.getmtime(prima_exe_path)
+    date_str = datetime.fromtimestamp(date_change).strftime('%d.%m.%y')
+
+    # Формируем новое имя для бэкапа
+    backup_name = f'PRIMA[{date_str}].exe'
+    backup_path = os.path.join(DIR_DESTINATION, backup_name)
+
+    if os.path.exists(backup_path):
+        print(f'{MESSAGE_OK}Бэкап уже существует: {backup_name}')
+        if os.path.getmtime(backup_path) >= date_change:
+            print(f'{MESSAGE_OK}Бэкап актуален')
+            return
+        else:
+            os.remove(backup_path)
+    # Переименовываем файл
+    try:
+        shutil.copy2(prima_exe_path, backup_path)
+        print(f'{MESSAGE_OK}Бэкап создан: {backup_name}')
+    except Exception as e:
+        print(f'{MESSAGE_FAILED}Не удалось создать бэкап: {e}')
 
 
 def copy_diff_files(files):
@@ -81,6 +106,7 @@ def copy_diff_files(files):
     Raises:
         OSError: If an error occurs while copying the files.
     """
+
     for file in files:
         source = file
         destination = file.replace(DIR_SOURCE, DIR_DESTINATION)
@@ -177,19 +203,24 @@ def main():
         return
     choice = user_interface()
     if choice == 1:
+        backup_prima_exe()
         copy_diff_files(diff)
         update_lnk()
     elif choice == 2:
+        backup_prima_exe()
         copy_diff_files(only)
         update_lnk()
     elif choice == 3:
+        backup_prima_exe()
         copy_diff_files(diff + only)
         update_lnk()
     elif choice == 4:
+        backup_prima_exe()
         copy_tree()
         update_lnk()
     elif choice == 5:
         print(f'{MESSAGE_OK}Изменения внесены не будут.')
+        update_lnk()
 
 
 # A common idiom to place the main functionality of a Python script in a function called main,

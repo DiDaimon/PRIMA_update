@@ -11,4 +11,4 @@ set PYTHON="%VENV_DIR%\Scripts\Python.exe"
 D:
 cd D:\User\PRIMA_Updated\
 start D:\User\PRIMA_Updated\PRIMA.exe
-timeout 10
+timeout 5
