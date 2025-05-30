@@ -1,0 +1,139 @@
+# logging.toml - современная конфигурация логирования PRIMA Updater
+
+[logging]
+# Основные настройки логирования
+version = 1
+disable_existing_loggers = false
+
+# Форматтеры для различных типов вывода
+[logging.formatters.standard]
+format = "%(asctime)s - %(levelname)s - %(message)s"
+datefmt = "%H:%M:%S"
+
+[logging.formatters.detailed]
+format = "%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(lineno)d - %(funcName)s() - %(message)s"
+datefmt = "%Y-%m-%d %H:%M:%S"
+
+[logging.formatters.colored]
+"()" = "utils.logger.ColoredFormatter"
+format = "%(asctime)s - %(levelname)s - %(message)s"
+datefmt = "%H:%M:%S"
+
+[logging.formatters.operation]
+format = "%(asctime)s | %(levelname)-8s | %(name)s | %(message)s"
+datefmt = "%Y-%m-%d %H:%M:%S"
+
+[logging.formatters.json]
+"()" = "pythonjsonlogger.jsonlogger.JsonFormatter"
+format = "%(asctime)s %(name)s %(levelname)s %(message)s"
+
+# Обработчики логов
+[logging.handlers.console]
+class = "logging.StreamHandler"
+level = "INFO"
+formatter = "colored"
+stream = "ext://sys.stdout"
+
+[logging.handlers.file]
+class = "logging.handlers.RotatingFileHandler"
+level = "DEBUG"
+formatter = "detailed"
+filename = "logs/prima_updater.log"
+maxBytes = 10485760  # 10MB
+backupCount = 5
+encoding = "utf-8"
+
+[logging.handlers.error_file]
+class = "logging.handlers.RotatingFileHandler"
+level = "ERROR"
+formatter = "detailed"
+filename = "logs/errors.log"
+maxBytes = 5242880  # 5MB
+backupCount = 3
+encoding = "utf-8"
+
+[logging.handlers.operation_file]
+class = "logging.handlers.TimedRotatingFileHandler"
+level = "DEBUG"
+formatter = "operation"
+filename = "logs/operations.log"
+when = "midnight"
+interval = 1
+backupCount = 7
+encoding = "utf-8"
+
+[logging.handlers.debug_file]
+class = "logging.FileHandler"
+level = "DEBUG"
+formatter = "detailed"
+filename = "logs/debug.log"
+mode = "w"
+encoding = "utf-8"
+
+# Конфигурация логгеров
+[logging.loggers.prima_updater]
+level = "INFO"
+handlers = ["console", "file", "error_file"]
+propagate = false
+
+[logging.loggers."prima_updater.file_operations"]
+level = "DEBUG"
+handlers = ["operation_file", "file"]
+propagate = false
+
+[logging.loggers."prima_updater.network"]
+level = "WARNING"
+handlers = ["file"]
+propagate = true
+
+[logging.loggers."prima_updater.backup"]
+level = "INFO"
+handlers = ["console", "file"]
+propagate = false
+
+# Корневой логгер
+[logging.root]
+level = "INFO"
+handlers = ["console", "file"]
+
+# Дополнительные настройки для различных режимов
+[logging.profiles.development]
+# Профиль для разработки
+level = "DEBUG"
+handlers = ["console", "debug_file"]
+colored_output = true
+
+[logging.profiles.production]
+# Профиль для продакшена
+level = "INFO"
+handlers = ["file", "error_file"]
+colored_output = false
+
+[logging.profiles.verbose]
+# Подробное логирование
+level = "DEBUG"
+handlers = ["console", "file", "operation_file", "debug_file"]
+colored_output = true
+
+# Фильтры (если понадобятся)
+[logging.filters.info_only]
+"()" = "logging.Filter"
+name = "INFO"
+
+# Настройки для интеграции с внешними системами
+[logging.external]
+# Sentry для отслеживания ошибок в продакшене
+sentry_dsn = ""  # Заполнить при необходимости
+sentry_level = "ERROR"
+
+# Slack для уведомлений о критических ошибках
+slack_webhook = ""  # Заполнить при необходимости
+slack_level = "CRITICAL"
+
+# Email уведомления
+smtp_host = ""
+smtp_port = 587
+smtp_user = ""
+smtp_password = ""
+email_level = "ERROR"
+email_to = []

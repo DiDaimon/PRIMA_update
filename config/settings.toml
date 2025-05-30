@@ -1,0 +1,64 @@
+# PRIMA Updater Configuration
+# Этот файл содержит все настройки программы обновления PRIMA.
+
+[server]
+# Путь к серверной директории программы PRIMA.
+directory = "\\\\tserver1\\RSU\\PRIMA"
+# Таймер подключения к серверу (в секундах).
+timeout = 30
+# Количество попыток подключения к серверу.
+retry_attempts = 3
+
+[local]
+# Путь к локальной директории программы PRIMA.
+directory = "D:\\User\\PRIMA_Updated"
+# Директория для бэкапов (если не указана, будет создана поддиректория backups).
+backup_directory = "D:\\User\\PRIMA_Updated\\backups"
+# Максимальное количество бэкапов.
+max_backups = 5
+
+[ignore]
+# Файлы для игнорирования при сравнении двух директорий.
+files = [
+    "PRIMA.ini",
+    "Server.ini",
+    "DTConfig.stc",
+]
+# Паттерны файлов для игнорирования при сравнении двух директорий.
+patterns = [
+    "*.log",
+    "*.tmp",
+]
+# Директории для игнорирования при сравнении двух директорий.
+directories = [
+    "tract",
+]
+
+[ui]
+# Очищать терминал перед запуском программы.
+clear_terminal = true
+# Показывать прогресс операций.
+show_progress = true
+# Автоматический режим (без запроса действий пользователя).
+auto_mode = false
+
+[logging]
+# Уровень логирования: DEBUG, INFO, WARNING, ERROR, CRITICAL.
+level = "INFO"
+# Путь к файлу логирования.
+file_path = "logs/prima_update.log"
+# Максимальный размер лог-файла (в МБ).
+max_file_size = "10MB"
+# Количество архивных лог-файлов.
+log_count = 5
+# Формат записи в лог.
+format = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# Дополнительные настройки для разработчиков
+[development]
+# Включить отладочный режим
+debug = false
+# Включить профилирование
+profiling = false
+# Сохранять детальные логи операций
+verbose_logging = false
