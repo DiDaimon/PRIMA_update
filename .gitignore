@@ -14,4 +14,7 @@ venv.bak/
 .ipynb_checkpoints
 
 .idea/
+
+# В процессе разработки
 prima_update_old.bat
+# Структура_меню.md
