@@ -1,234 +1,177 @@
 # -*- coding: utf-8 -*-
-"""Программа выполняет обновление PRIMA с сервера.
-TODO:
-    * Добавить проверку доступности сервера.
-    * Добавить проверку наличия ярлыка на рабочем столе.
-    * Добавить проверку наличия бэкапа, и чистку бэкапов.
-    * Добавить проверку наличия обновления.
-    * Добавить логирование.
-    * Разделить код и привести структуру кода к современному стандарту.
-    * Придумать что-нибудь с меню (вложенные меню, выбор опции, восстановление из бэкапа, etc.)
+"""Главный модуль программы обновления PRIMA с сервера.
 
+Этот модуль является точкой входа приложения и координирует работу всех модулей:
+- Проверка доступности сервера
+- Сравнение директорий
+- Управление бэкапами
+- Синхронизация файлов
+- Обновление ярлыка на рабочем столе
 """
-import configparser
-import os
-import shutil
-from datetime import datetime
-from filecmp import dircmp
-from art import tprint
-from colorama import init, Fore, Style
 
-# Читаем файл с настройками и объявляем глобальные переменные.
-config = configparser.ConfigParser()
-config.read("settings.ini")
-DIR_SOURCE = config['Global']['server_directory']
-DIR_DESTINATION = config['Global']['local_directory']
-IGNORE = config['Ignore']['list'].split(sep=',')  # Список файлов и папок для игнорирования.
-
-# Добавляем краски в терминал
-init(autoreset=True)
-MESSAGE_FAILED = Fore.RED + Style.BRIGHT + "[FAILED] " + Style.RESET_ALL + Fore.RED
-MESSAGE_ATTENTION = Fore.YELLOW + Style.BRIGHT + "[ATTENTION] " + Style.RESET_ALL + Fore.YELLOW
-MESSAGE_OK = Fore.GREEN + Style.BRIGHT + "[OK] " + Style.RESET_ALL + Fore.GREEN
-MESSAGE_WARNING = Fore.BLUE + Style.BRIGHT + "[WARNING] " + Style.RESET_ALL + Fore.BLUE
-
-
-def clear_terminal():
-    """
-    Clears the terminal screen.
-
-    This function is used to clear the terminal screen by executing the appropriate command based
-    on the operating system. If the operating system is Windows, the 'cls' command is executed.
-    Otherwise, the 'clear' command is executed.
-
-    """
-    os.system('cls' if os.name == 'nt' else 'clear')
-
-
-def update_lnk():
-    """
-    Updates the shortcut on the desktop with the latest version of PRIMA.
-    
-    This function takes no parameters.
-    
-    Raises:
-        FileNotFoundError: If the PRIMA executable file is not found in the source directory.
-    """
-    path = os.path.expanduser('~\\Desktop\\')
-    date_change = os.path.getmtime(os.path.join(DIR_DESTINATION, 'PRIMA.exe'))
-    new_date = datetime.fromtimestamp(date_change).strftime('%d.%m.%y')
-    for file in os.listdir(path):
-        if '[PRIMA]' in file:
-            old_name = file
-            if new_date in old_name:
-                return
-            else:
-                os.rename(os.path.join(path, old_name), os.path.join(path, f'[PRIMA] {new_date}.lnk'))
-                print(f'{MESSAGE_OK}Ярлык на Рабочем столе изменен на [PRIMA] {new_date}')
-                return
-    print(f'{MESSAGE_FAILED}Ярлык на рабочем столе не найден')
-
-
-def backup_prima_exe():
-    prima_exe_path = os.path.join(DIR_DESTINATION, 'PRIMA.exe')  # Путь к файлу PRIMA.exe
-    if not os.path.exists(prima_exe_path):
-        print(f'{MESSAGE_FAILED}Файл PRIMA.exe не найден в целевой директории.')
-        return
-
-    # Получаем дату изменения файла
-    date_change = os.path.getmtime(prima_exe_path)
-    date_str = datetime.fromtimestamp(date_change).strftime('%d.%m.%y')
-
-    # Формируем новое имя для бэкапа
-    backup_name = f'PRIMA[{date_str}].exe'
-    backup_path = os.path.join(DIR_DESTINATION, backup_name)
-
-    if os.path.exists(backup_path):
-        print(f'{MESSAGE_OK}Бэкап уже существует: {backup_name}')
-        if os.path.getmtime(backup_path) >= date_change:
-            print(f'{MESSAGE_OK}Бэкап актуален')
-            return
-        else:
-            os.remove(backup_path)
-    # Переименовываем файл
-    try:
-        shutil.copy2(prima_exe_path, backup_path)
-        print(f'{MESSAGE_OK}Бэкап создан: {backup_name}')
-    except Exception as e:
-        print(f'{MESSAGE_FAILED}Не удалось создать бэкап: {e}')
-
-
-def copy_diff_files(files):
-    """
-    Copies the specified files to a destination directory.
-
-    Args:
-        files (List[str]): A list of file paths to be copied.
-
-    Returns:
-        None
-
-    Raises:
-        OSError: If an error occurs while copying the files.
-    """
-
-    for file in files:
-        source = file
-        destination = file.replace(DIR_SOURCE, DIR_DESTINATION)
-        if os.path.isdir(file):
-            try:
-                shutil.copytree(source, destination)
-                print(f'{MESSAGE_OK}Каталог {destination} успешно переписан')
-            except:
-                print(f'{MESSAGE_FAILED}Каталог {destination} не переписан')
-        else:
-            try:
-                shutil.copy(source, destination)
-                print(f'{MESSAGE_OK}Файл {destination} успешно переписан')
-            except:
-                print(f'{MESSAGE_FAILED}Файл {destination} не переписан')
-
-
-def copy_tree():
-    """
-    Copy the entire directory tree (including all files and subdirectories) from DIR_SOURCE to
-    DIR_DESTINATION. If the destination directory already exists, the function will copy the
-    contents of DIR_SOURCE into it. If the destination directory does not exist, it will be created.
-    """
-    try:
-        shutil.copytree(DIR_SOURCE, DIR_DESTINATION, dirs_exist_ok=True)
-        print(f'{MESSAGE_OK}Папка PRIMA полностью скопирована.')
-    except:
-        print(f'{MESSAGE_FAILED}Копирование не удалось')
-
-
-def diff_files(dcmp, diff_lst: list, only_lst: list):
-    """
-    Generate a list of files that are different or missing between two directories.
-
-    Args:
-        dcmp (dc.DirCmp): A directory comparison object.
-        diff_lst (list): A list to store the paths of different files.
-        only_lst (list): A list to store the paths of missing files.
-    """
-    if dcmp.diff_files:
-        for file in dcmp.diff_files:
-            print(f'{MESSAGE_ATTENTION}[*] Файл изменен: {file}')
-            diff_lst.append(f'{dcmp.left}\\{file}')
-    if dcmp.left_only:
-        for file in dcmp.left_only:
-            print(f'{MESSAGE_ATTENTION}[-] Файл отсутствует: {file}')
-            only_lst.append(f'{dcmp.left}\\{file}')
-    for sub_dcmp in dcmp.subdirs.values():
-        diff_files(sub_dcmp, diff_lst, only_lst)
-
-
-def user_interface():
-    """
-    Displays a user interface menu and prompts the user to choose an action.
-
-    Returns:
-        int: The user's chosen action, which is a number between 1 and 5.
-    """
-    print('''
-Выберите действие и нажмите Enter:
- [1] Для замены измененных файлов.
- [2] Для копирования отсутствующих файлов.
- [3] Для внесения всех изменений.
- [4] Для полного копирования.
- [5] Для пропуска (без изменений).
-    ''')
-    while True:
-        answer = input('Выберите действие: ')
-        if answer.isdecimal() and 1 <= int(answer) <= 5:
-            return int(answer)
-        else:
-            print('Неверный ввод повторить')
+from pathlib import Path
+from prima_updater import (
+    Config,
+    setup_logging,
+    validate_paths,
+    BackupManager,
+    FileSync,
+    UserInterface
+)
 
 
 def main():
+    """Главная функция программы.
+    
+    Выполняет последовательность действий:
+    1. Инициализация конфигурации и логирования
+    2. Проверка доступности сервера и валидация путей
+    3. Сравнение директорий и поиск изменений
+    4. Отображение меню и обработка выбора пользователя
+    5. Выполнение выбранного действия
     """
-	This function is the main entry point of the program.
-
-    It clears the terminal, prints the program name, and checks for changes between two directories.
-    It then prompts the user for a choice and performs different actions based on the user's input.
-    The function returns nothing.
-
-	"""
-    # Выводим название программы
-    clear_terminal()
-    tprint('PRIMA - UPDATER', font='tarty1')
-
-    diff_object = dircmp(DIR_SOURCE, DIR_DESTINATION, IGNORE)
-    print('\nПроверка наличия изменений:')
-    diff, only = [], []
-    diff_files(diff_object, diff, only)
-    if not diff and not only:
-        print(f'{MESSAGE_OK}Изменений не обнаружено.')
+    # Инициализация конфигурации
+    config = Config()
+    
+    # Настройка логирования
+    logger = setup_logging()
+    logger.info("=" * 60)
+    logger.info("Запуск программы обновления PRIMA")
+    logger.info("=" * 60)
+    
+    # Инициализация пользовательского интерфейса
+    ui = UserInterface(logger)
+    ui.show_header()
+    
+    # Проверка доступности сервера и валидация путей
+    logger.info("Проверка доступности сервера и валидация путей...")
+    if not validate_paths(config.server_directory, config.local_directory, logger):
+        error_msg = "Сервер недоступен или пути невалидны. Проверьте настройки."
+        logger.error(error_msg)
         return
-    choice = user_interface()
-    if choice == 1:
-        backup_prima_exe()
-        copy_diff_files(diff)
-        update_lnk()
-    elif choice == 2:
-        backup_prima_exe()
-        copy_diff_files(only)
-        update_lnk()
-    elif choice == 3:
-        backup_prima_exe()
-        copy_diff_files(diff + only)
-        update_lnk()
-    elif choice == 4:
-        backup_prima_exe()
-        copy_tree()
-        update_lnk()
-    elif choice == 5:
-        print(f'{MESSAGE_OK}Изменения внесены не будут.')
-        update_lnk()
+    
+    # Инициализация синхронизатора файлов
+    file_sync = FileSync(
+        config.server_directory,
+        config.local_directory,
+        config.ignore_list,
+        logger
+    )
+    
+    # Сравнение директорий
+    logger.info("Начало сравнения директорий...")
+    diff_files, only_files = file_sync.compare_directories()
+    
+    # Отображение найденных изменений
+    ui.show_changes(diff_files, only_files)
+    
+    # Если изменений нет, просто обновляем ярлык и выходим
+    if not diff_files and not only_files:
+        logger.info("Изменений не обнаружено. Обновление ярлыка и завершение работы.")
+        prima_exe_path = config.get_prima_exe_path()
+        if prima_exe_path.exists():
+            ui.update_shortcut(config.desktop_path, prima_exe_path)
+        return
+    
+    # Инициализация менеджера бэкапов
+    prima_exe_path = config.get_prima_exe_path()
+    logger.debug(f"Путь к PRIMA.exe: {prima_exe_path}")
+    backup_manager = BackupManager(prima_exe_path, None, logger)
+    
+    # Проверяем наличие бэкапов для отображения опции восстановления
+    backups = backup_manager.get_all_backups()
+    has_backups = len(backups) > 0
+    if has_backups:
+        logger.info(f"Найдено доступных бэкапов: {len(backups)}")
+    else:
+        logger.debug("Доступных бэкапов не найдено")
+    
+    # Отображение меню и получение выбора пользователя
+    choice = ui.show_menu(has_backups=has_backups)
+    logger.info(f"Пользователь выбрал действие: {choice}")
+    
+    # Обработка выбора пользователя
+    if choice == UserInterface.ACTION_RESTORE_BACKUP:
+        # Восстановление из бэкапа
+        backup_index = ui.show_backup_list(backups)
+        if backup_index >= 0:
+            backup_path = backups[backup_index]
+            logger.info(f"Попытка восстановления из бэкапа: {backup_path.name}")
+            if backup_manager.restore_from_backup(backup_path):
+                success_msg = "Восстановление из бэкапа выполнено успешно"
+                logger.info(success_msg)
+                ui.update_shortcut(config.desktop_path, prima_exe_path)
+            else:
+                error_msg = "Ошибка при восстановлении из бэкапа"
+                logger.error(error_msg)
+        else:
+            logger.info("Пользователь отменил восстановление из бэкапа")
+        return
+    
+    # Для всех остальных действий создаем бэкап перед изменениями
+    if choice != UserInterface.ACTION_SKIP:
+        logger.info("Создание бэкапа перед обновлением...")
+        backup_result = backup_manager.create_backup()
+        if backup_result:
+            logger.debug(f"Бэкап создан: {backup_result.name}")
+        backup_manager.cleanup_old_backups()
+    
+    # Выполнение выбранного действия
+    if choice == UserInterface.ACTION_UPDATE_CHANGED:
+        # Обновление только измененных файлов
+        logger.info(f"Обновление измененных файлов. Количество файлов: {len(diff_files)}")
+        if file_sync.copy_files(diff_files):
+            success_msg = "Измененные файлы успешно обновлены"
+            logger.info(success_msg)
+        else:
+            error_msg = "Ошибки при обновлении файлов"
+            logger.error(error_msg)
+    
+    elif choice == UserInterface.ACTION_COPY_MISSING:
+        # Копирование только отсутствующих файлов
+        logger.info(f"Копирование отсутствующих файлов. Количество файлов: {len(only_files)}")
+        if file_sync.copy_files(only_files):
+            success_msg = "Отсутствующие файлы успешно скопированы"
+            logger.info(success_msg)
+        else:
+            error_msg = "Ошибки при копировании файлов"
+            logger.error(error_msg)
+    
+    elif choice == UserInterface.ACTION_UPDATE_ALL:
+        # Обновление всех изменений (измененные + отсутствующие)
+        all_files = diff_files + only_files
+        logger.info(f"Обновление всех изменений. Всего файлов: {len(all_files)} (изменено: {len(diff_files)}, отсутствует: {len(only_files)})")
+        if file_sync.copy_files(all_files):
+            success_msg = "Все изменения успешно применены"
+            logger.info(success_msg)
+        else:
+            error_msg = "Ошибки при применении изменений"
+            logger.error(error_msg)
+    
+    elif choice == UserInterface.ACTION_FULL_COPY:
+        # Полное копирование директории
+        logger.info("Выполнение полного копирования директории")
+        if file_sync.copy_all():
+            success_msg = "Полное копирование завершено успешно"
+            logger.info(success_msg)
+        else:
+            error_msg = "Ошибка при полном копировании"
+            logger.error(error_msg)
+    
+    elif choice == UserInterface.ACTION_SKIP:
+        # Пропуск изменений
+        skip_msg = "Изменения внесены не будут."
+        logger.info(f"Пользователь пропустил обновление. {skip_msg}")
+    
+    # Обновление ярлыка на рабочем столе
+    if prima_exe_path.exists():
+        logger.debug("Обновление ярлыка на рабочем столе...")
+        ui.update_shortcut(config.desktop_path, prima_exe_path)
+    else:
+        logger.warning(f"Файл PRIMA.exe не найден по пути: {prima_exe_path}. Ярлык не обновлен.")
+    
+    logger.info("Работа программы завершена успешно")
 
 
-# A common idiom to place the main functionality of a Python script in a function called main,
-# and then use the following idiom at the end of the script:
 if __name__ == '__main__':
     main()
