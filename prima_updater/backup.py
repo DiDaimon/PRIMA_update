@@ -82,7 +82,7 @@ class BackupManager:
             List[Path]: Список путей к файлам бэкапов
         """
         backups = []
-        pattern = "PRIMA[*].exe"
+        pattern = "PRIMA*.exe"
         
         for file_path in self.backup_directory.glob(pattern):
             if file_path.is_file():

@@ -38,6 +38,10 @@ class Config:
     # Путь к рабочему столу пользователя
     DESKTOP_PATH = None
     
+    # Директория для логов и бэкапов (по умолчанию - папки проекта)
+    LOGS_DIRECTORY = str((Path(__file__).resolve().parent.parent / 'logs'))
+    BACKUPS_DIRECTORY = str((Path(__file__).resolve().parent.parent / 'backups'))
+    
     def __init__(self):
         """Инициализация конфигурации.
         
@@ -97,4 +101,22 @@ class Config:
             Path: Полный путь к PRIMA.exe
         """
         return Path(self.local_directory) / self.prima_exe
+    
+    @property
+    def logs_directory(self) -> str:
+        """Возвращает путь к директории для логов.
+        
+        Returns:
+            str: Путь к директории логов
+        """
+        return self.LOGS_DIRECTORY
+    
+    @property
+    def backups_directory(self) -> str:
+        """Возвращает путь к директории для бэкапов.
+        
+        Returns:
+            str: Путь к директории бэкапов
+        """
+        return self.BACKUPS_DIRECTORY
 

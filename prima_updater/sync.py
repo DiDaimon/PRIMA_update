@@ -125,7 +125,7 @@ class FileSync:
         
         return success
     
-    def copy_all(self) -> bool:
+    def copy_all(self, remove_from_ignore: list | None = None, overwrite_all: bool = False) -> bool:
         """Копирует всю директорию из исходной в целевую.
         
         Выполняет полное копирование всех файлов и поддиректорий.
@@ -136,12 +136,23 @@ class FileSync:
         try:
             dest_path = Path(self.destination_dir)
             
-            # Удаляем целевую директорию, если она существует
+            # Полное переписывание всего без игнор-листа
+            if overwrite_all:
+                if dest_path.exists():
+                    shutil.rmtree(str(dest_path))
+                shutil.copytree(self.source_dir, str(dest_path))
+                self.logger.info(f"Полное копирование (переписать все) завершено: {self.destination_dir}")
+                return True
+
+            # Копирование с учетом игнор-листа (с возможным исключением элементов)
+            # Готовим эффективный ignore-лист
+            effective_ignore = list(self.ignore_list)
+            if remove_from_ignore:
+                effective_ignore = [x for x in effective_ignore if x not in remove_from_ignore]
+
             if dest_path.exists():
                 shutil.rmtree(str(dest_path))
-            
-            # Копируем всю директорию
-            shutil.copytree(self.source_dir, str(dest_path), ignore=shutil.ignore_patterns(*self.ignore_list))
+            shutil.copytree(self.source_dir, str(dest_path), ignore=shutil.ignore_patterns(*effective_ignore))
             self.logger.info(f"Полное копирование завершено: {self.destination_dir}")
             return True
             
