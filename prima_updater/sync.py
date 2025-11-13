@@ -4,11 +4,21 @@
 Этот модуль содержит класс FileSync для сравнения директорий и копирования файлов.
 """
 
-import shutil
 import logging
+import shutil
 from filecmp import dircmp
 from pathlib import Path
 from typing import List, Union
+
+from rich.progress import (
+    BarColumn,
+    Progress,
+    SpinnerColumn,
+    TextColumn,
+    TimeElapsedColumn,
+)
+
+from .rich_console import get_console
 
 
 class FileSync:
@@ -31,6 +41,7 @@ class FileSync:
         self.destination_dir = str(destination_dir) if isinstance(destination_dir, Path) else destination_dir
         self.ignore_list = ignore_list
         self.logger = logger or logging.getLogger('PRIMA_Updater')
+        self.console = get_console()
     
     def compare_directories(self) -> tuple[List[str], List[str]]:
         """Сравнивает две директории и находит различия.
@@ -91,38 +102,57 @@ class FileSync:
         success = True
         source_path = Path(self.source_dir)
         dest_path = Path(self.destination_dir)
-        
-        for file_path_str in file_paths:
-            try:
-                file_path = Path(file_path_str)
-                
-                # Формируем путь назначения
-                relative_path = file_path.relative_to(source_path)
-                destination = dest_path / relative_path
-                
-                # Создаем директорию назначения, если её нет
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                
-                # Копируем файл или директорию
-                if file_path.is_dir():
-                    if destination.exists():
-                        shutil.rmtree(str(destination))
-                    shutil.copytree(str(file_path), str(destination))
-                    self.logger.info(f"Каталог скопирован: {destination}")
-                else:
-                    shutil.copy2(str(file_path), str(destination))
-                    self.logger.info(f"Файл скопирован: {destination}")
-                    
-            except PermissionError as e:
-                self.logger.error(f"Нет прав доступа для копирования {file_path_str}: {e}")
-                success = False
-            except OSError as e:
-                self.logger.error(f"Ошибка при копировании {file_path_str}: {e}")
-                success = False
-            except Exception as e:
-                self.logger.error(f"Неожиданная ошибка при копировании {file_path_str}: {e}")
-                success = False
-        
+
+        if not file_paths:
+            return True
+
+        progress_columns = (
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+        )
+
+        with Progress(*progress_columns, console=self.console, transient=True) as progress:
+            task = progress.add_task("[info]Подготовка...", total=len(file_paths))
+
+            for file_path_str in file_paths:
+                try:
+                    file_path = Path(file_path_str)
+
+                    # Формируем путь назначения
+                    relative_path = file_path.relative_to(source_path)
+                    destination = dest_path / relative_path
+
+                    # Создаем директорию назначения, если её нет
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+
+                    description = f"[info]Копирование: {relative_path.as_posix()}"
+                    progress.update(task, description=description)
+
+                    # Копируем файл или директорию
+                    if file_path.is_dir():
+                        if destination.exists():
+                            shutil.rmtree(str(destination))
+                        shutil.copytree(str(file_path), str(destination))
+                        self.logger.info("Каталог скопирован: %s", destination)
+                    else:
+                        shutil.copy2(str(file_path), str(destination))
+                        self.logger.info("Файл скопирован: %s", destination)
+
+                except PermissionError as e:
+                    self.logger.error("Нет прав доступа для копирования %s: %s", file_path_str, e)
+                    success = False
+                except OSError as e:
+                    self.logger.error("Ошибка при копировании %s: %s", file_path_str, e)
+                    success = False
+                except Exception as e:
+                    self.logger.error("Неожиданная ошибка при копировании %s: %s", file_path_str, e)
+                    success = False
+                finally:
+                    progress.advance(task)
+
         return success
     
     def copy_all(self, remove_from_ignore: list | None = None, overwrite_all: bool = False) -> bool:
@@ -133,30 +163,39 @@ class FileSync:
         Returns:
             bool: True если копирование успешно, False в противном случае
         """
-        try:
-            dest_path = Path(self.destination_dir)
-            
-            # Полное переписывание всего без игнор-листа
-            if overwrite_all:
+        dest_path = Path(self.destination_dir)
+
+        status_message = "[info]Подготовка полного копирования..."
+        with self.console.status(status_message, spinner="dots") as status:
+            try:
+                # Полное переписывание всего без игнор-листа
+                if overwrite_all:
+                    status.update("[info]Удаление существующей директории...[/info]")
+                    if dest_path.exists():
+                        shutil.rmtree(str(dest_path))
+                    status.update("[info]Копирование всех файлов...[/info]")
+                    shutil.copytree(self.source_dir, str(dest_path))
+                    self.logger.info("Полное копирование (переписать все) завершено: %s", self.destination_dir)
+                    return True
+
+                effective_ignore = list(self.ignore_list)
+                if remove_from_ignore:
+                    effective_ignore = [x for x in effective_ignore if x not in remove_from_ignore]
+
+                status.update("[info]Очистка целевой директории...[/info]")
                 if dest_path.exists():
                     shutil.rmtree(str(dest_path))
-                shutil.copytree(self.source_dir, str(dest_path))
-                self.logger.info(f"Полное копирование (переписать все) завершено: {self.destination_dir}")
+
+                status.update("[info]Копирование с учётом ignore-листа...[/info]")
+                shutil.copytree(
+                    self.source_dir,
+                    str(dest_path),
+                    ignore=shutil.ignore_patterns(*effective_ignore) if effective_ignore else None,
+                )
+                self.logger.info("Полное копирование завершено: %s", self.destination_dir)
                 return True
 
-            # Копирование с учетом игнор-листа (с возможным исключением элементов)
-            # Готовим эффективный ignore-лист
-            effective_ignore = list(self.ignore_list)
-            if remove_from_ignore:
-                effective_ignore = [x for x in effective_ignore if x not in remove_from_ignore]
-
-            if dest_path.exists():
-                shutil.rmtree(str(dest_path))
-            shutil.copytree(self.source_dir, str(dest_path), ignore=shutil.ignore_patterns(*effective_ignore))
-            self.logger.info(f"Полное копирование завершено: {self.destination_dir}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Ошибка при полном копировании: {e}")
-            return False
+            except Exception as e:
+                self.logger.error("Ошибка при полном копировании: %s", e)
+                return False
 

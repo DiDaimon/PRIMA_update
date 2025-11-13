@@ -20,9 +20,7 @@ except ImportError:
     print("pip install rich questionary")
     exit(1)
 
-from colorama import init
 from datetime import datetime
-init(autoreset=True)
 
 console = Console()
 

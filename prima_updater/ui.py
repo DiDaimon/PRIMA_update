@@ -1,17 +1,21 @@
-# -*- coding: utf-8 -*-
 """Модуль пользовательского интерфейса.
 
 Этот модуль содержит функции для взаимодействия с пользователем:
-отображение меню, выбор действий, вывод сообщений с цветовой индикацией.
+отображение меню, выбор действий, вывод сообщений в консоли Rich.
 """
 
-import os
 import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Union
-from art import tprint
-from colorama import init
+
+from art import text2art
+from rich.align import Align
+from rich.panel import Panel
+from rich.prompt import Confirm, Prompt
+from rich.table import Table
+
+from .rich_console import get_console
 
 
 class UserInterface:
@@ -44,51 +48,63 @@ class UserInterface:
             logger (logging.Logger, optional): Логгер для записи сообщений
         """
         self.logger = logger or logging.getLogger('PRIMA_Updater')
-        # Инициализируем colorama для поддержки цветов в Windows
-        init(autoreset=True)
-        
-        # Цветовые константы больше не нужны, так как используется цветное логирование
+        self.console = get_console()
     
     def clear_terminal(self):
-        """Очищает экран терминала.
-        
-        Выполняет команду очистки экрана в зависимости от операционной системы.
-        """
-        os.system('cls' if os.name == 'nt' else 'clear')
+        """Очищает экран терминала."""
+        self.console.clear()
     
     def show_header(self):
-        """Отображает заголовок программы.
-        
-        Очищает экран и выводит название программы в ASCII-арте.
-        """
+        """Отображает заголовок программы в панеле Rich."""
         self.clear_terminal()
-        tprint('PRIMA - UPDATER', font='tarty1')
+        header_text = text2art('PRIMA - UPDATER', font='tarty1')
+        panel = Panel(
+            Align.center(header_text.rstrip(), vertical="middle"),
+            title="[menu.title]PRIMA Updater[/menu.title]",
+            border_style="menu.title"
+        )
+        self.console.print(panel)
+    
+    def _render_changes_table(self, diff_files: list, only_files: list) -> Table:
+        """Формирует таблицу с изменениями."""
+        table = Table(
+            title="[menu.title]Найденные изменения[/menu.title]",
+            show_lines=False,
+            header_style="bold magenta",
+            expand=True,
+        )
+        table.add_column("Тип", style="info", width=14)
+        table.add_column("Файл", style="menu.item", width=30, no_wrap=True)
+        table.add_column("Путь", style="dim", overflow="fold")
+        
+        for file_path in diff_files:
+            path = Path(file_path)
+            table.add_row("Изменен", path.name, str(path.parent))
+        
+        for file_path in only_files:
+            path = Path(file_path)
+            table.add_row("Отсутствует", path.name, str(path.parent))
+        
+        return table
     
     def show_changes(self, diff_files: list, only_files: list):
-        """Отображает список найденных изменений.
-        
-        Args:
-            diff_files (list): Список измененных файлов
-            only_files (list): Список отсутствующих файлов
-        """
-        self.logger.info('Проверка наличия изменений...')
+        """Отображает список найденных изменений."""
         
         if not diff_files and not only_files:
             self.logger.info("Изменений не обнаружено")
+            self.console.print(
+                Panel("[info]Изменений не обнаружено[/info]", border_style="info")
+            )
             return
         
-        # Логируем общую информацию о найденных изменениях
-        self.logger.info(f"Найдено изменений: измененных файлов - {len(diff_files)}, отсутствующих файлов - {len(only_files)}")
+        self.logger.info(
+            "Найдено изменений: измененных файлов - %s, отсутствующих файлов - %s",
+            len(diff_files),
+            len(only_files),
+        )
         
-        # Выводим измененные файлы
-        for file_path in diff_files:
-            file_name = Path(file_path).name
-            self.logger.warning(f"[*] Файл изменен: {file_name}")
-        
-        # Выводим отсутствующие файлы
-        for file_path in only_files:
-            file_name = Path(file_path).name
-            self.logger.warning(f"[-] Файл отсутствует: {file_name}")
+        table = self._render_changes_table(diff_files, only_files)
+        self.console.print(table)
     
     def show_menu(self) -> int:
         """Отображает главное меню выбора действий и возвращает выбор пользователя.
@@ -96,52 +112,28 @@ class UserInterface:
         Returns:
             int: Выбранное действие
         """
-        print('\n' + '=' * 60)
-        print(' ' * 20 + 'ВЫБЕРИТЕ ДЕЙСТВИЕ')
-        print('=' * 60)
-        print()
+        menu_items = [
+            "[menu.hotkey][1][/menu.hotkey] [menu.item]Обновить все[/menu.item]",
+            "[menu.hotkey][2][/menu.hotkey] [menu.item]Дополнительные опции[/menu.item]",
+            "[menu.hotkey][3][/menu.hotkey] [menu.item]Восстановить из бэкапа[/menu.item]",
+            "[menu.hotkey][4][/menu.hotkey] [menu.item]Пропустить обновление[/menu.item]",
+        ]
+        panel = Panel("\n".join(menu_items), title="[menu.title]Выберите действие[/menu.title]", border_style="menu.title")
+        self.console.print(panel)
         
-        print('📦 ОБНОВЛЕНИЕ:')
-        print('  [1] Обновить все')
-        print('  [2] Дополнительно')
-        print()
-        print('💾 ВОССТАНОВЛЕНИЕ:')
-        print('  [3] Восстановить из бэкапа')
-        print()
+        choices = ["1", "2", "3", "4"]
+        answer = Prompt.ask("Ваш выбор", choices=choices, default="1")
+        choice = int(answer)
         
-        print('❌ ОТМЕНА:')
-        print('  [4] Пропустить обновление')
-        print()
-        print('=' * 60)
-        print()
-        
-        max_choice = 4
-        
-        while True:
-            try:
-                answer = input('Выберите действие: ')
-                if answer.isdecimal():
-                    choice = int(answer)
-                    if 1 <= choice <= max_choice:
-                        # Преобразуем выбор пользователя в константу действия
-                        if choice == 1:
-                            action = self.ACTION_UPDATE_ALL
-                        elif choice == 2:
-                            action = self.ACTION_ADDITIONAL
-                        elif choice == 3:
-                            action = self.ACTION_RESTORE_BACKUP
-                        elif choice == 4:
-                            action = self.ACTION_SKIP
-                        else:
-                            action = choice
-                        
-                        self.logger.debug(f"Пользователь выбрал действие: {action}")
-                        return action
-                self.logger.debug(f"Неверный ввод от пользователя: '{answer}'")
-                self.logger.warning('Неверный ввод, повторите')
-            except (ValueError, KeyboardInterrupt) as e:
-                self.logger.debug(f"Ошибка ввода: {type(e).__name__}")
-                self.logger.warning('Неверный ввод, повторите')
+        mapping = {
+            1: self.ACTION_UPDATE_ALL,
+            2: self.ACTION_ADDITIONAL,
+            3: self.ACTION_RESTORE_BACKUP,
+            4: self.ACTION_SKIP,
+        }
+        action = mapping.get(choice, self.ACTION_SKIP)
+        self.logger.debug("Пользователь выбрал действие: %s", action)
+        return action
     
     def show_additional_menu(self) -> int:
         """Отображает подменю дополнительных опций обновления.
@@ -149,42 +141,28 @@ class UserInterface:
         Returns:
             int: Выбранное действие из подменю
         """
-        print('\n' + '=' * 60)
-        print(' ' * 15 + 'ДОПОЛНИТЕЛЬНЫЕ ОПЦИИ')
-        print('=' * 60)
-        print()
-        print('📦 ОБНОВЛЕНИЕ:')
-        print('  [1] Обновить только измененные файлы')
-        print('  [2] Скопировать только отсутствующие файлы')
-        print('  [3] Полное копирование директории')
-        print()
-        print('  [0] Назад в главное меню')
-        print()
-        print('=' * 60)
-        print()
+        menu_items = [
+            "[menu.hotkey][1][/menu.hotkey] [menu.item]Обновить только измененные файлы[/menu.item]",
+            "[menu.hotkey][2][/menu.hotkey] [menu.item]Скопировать только отсутствующие файлы[/menu.item]",
+            "[menu.hotkey][3][/menu.hotkey] [menu.item]Полное копирование директории[/menu.item]",
+            "[menu.hotkey][0][/menu.hotkey] [menu.item]Назад[/menu.item]",
+        ]
+        panel = Panel("\n".join(menu_items), title="[menu.title]Дополнительные опции[/menu.title]", border_style="menu.title")
+        self.console.print(panel)
         
-        while True:
-            try:
-                answer = input('Выберите действие: ')
-                if answer.isdecimal():
-                    choice = int(answer)
-                    if choice == 0:
-                        self.logger.debug("Пользователь вернулся в главное меню")
-                        return -1  # Специальное значение для возврата в главное меню
-                    elif choice == 1:
-                        self.logger.debug("Пользователь выбрал: Обновить только измененные файлы")
-                        return self.ACTION_UPDATE_CHANGED
-                    elif choice == 2:
-                        self.logger.debug("Пользователь выбрал: Скопировать только отсутствующие файлы")
-                        return self.ACTION_COPY_MISSING
-                    elif choice == 3:
-                        self.logger.debug("Пользователь выбрал: Полное копирование директории")
-                        return self.ACTION_FULL_COPY
-                self.logger.debug(f"Неверный ввод от пользователя: '{answer}'")
-                self.logger.warning('Неверный ввод, повторите')
-            except (ValueError, KeyboardInterrupt) as e:
-                self.logger.debug(f"Ошибка ввода: {type(e).__name__}")
-                self.logger.warning('Неверный ввод, повторите')
+        choices = ["0", "1", "2", "3"]
+        answer = Prompt.ask("Ваш выбор", choices=choices, default="0")
+        choice = int(answer)
+        
+        mapping = {
+            0: -1,
+            1: self.ACTION_UPDATE_CHANGED,
+            2: self.ACTION_COPY_MISSING,
+            3: self.ACTION_FULL_COPY,
+        }
+        action = mapping.get(choice, -1)
+        self.logger.debug("Пользователь выбрал дополнительное действие: %s", action)
+        return action
     
     def show_full_copy_options(self, local_dir: str) -> int:
         """Отображает варианты полного копирования в зависимости от наличия ini-файлов.
@@ -199,84 +177,67 @@ class UserInterface:
         has_prima_ini = (local_path / 'PRIMA.ini').exists()
         has_servers_ini = (local_path / 'Servers.ini').exists()
         
-        print('\n' + '=' * 60)
-        print(' ' * 12 + 'ПАРАМЕТРЫ ПОЛНОГО КОПИРОВАНИЯ')
-        print('=' * 60)
-        print()
-        
         if has_prima_ini or has_servers_ini:
-            print('Обнаружены конфигурационные файлы в целевой директории:')
+            items = [
+                "[menu.hotkey][1][/menu.hotkey] Полное копирование (с учётом ignore-листа)",
+                "[menu.hotkey][2][/menu.hotkey] Не игнорировать PRIMA.ini",
+                "[menu.hotkey][3][/menu.hotkey] Не игнорировать Servers.ini",
+                "[menu.hotkey][4][/menu.hotkey] Не игнорировать оба файла",
+                "[menu.hotkey][5][/menu.hotkey] Полное копирование (переписать всё)",
+                "[menu.hotkey][0][/menu.hotkey] Назад",
+            ]
+            files_detected = []
             if has_prima_ini:
-                print('  • PRIMA.ini')
+                files_detected.append("[info]• PRIMA.ini[/info]")
             if has_servers_ini:
-                print('  • Servers.ini')
-            print()
-            print('Выберите вариант:')
-            print('  [1] Полное копирование (ignore-лист включен)')
-            print('  [2] Не игнорировать PRIMA.ini')
-            print('  [3] Не игнорировать Servers.ini')
-            print('  [4] Не игнорировать PRIMA.ini и Servers.ini')
-            print('  [5] Полное копирование (переписать все)')
-            print('  [0] Назад')
-            print()
-            
-            while True:
-                try:
-                    answer = input('Выберите действие: ')
-                    if answer.isdecimal():
-                        choice = int(answer)
-                        if choice == 0:
-                            return -1
-                        if choice == 1:
-                            return self.ACTION_FULL_COPY_IGNORE
-                        if choice == 2:
-                            return self.ACTION_FULL_COPY_KEEP_PRIMA
-                        if choice == 3:
-                            return self.ACTION_FULL_COPY_KEEP_SERVERS
-                        if choice == 4:
-                            return self.ACTION_FULL_COPY_KEEP_BOTH
-                        if choice == 5:
-                            return self.ACTION_FULL_COPY_OVERWRITE_ALL
-                    self.logger.debug(f"Неверный ввод при выборе полного копирования: '{answer}'")
-                    self.logger.warning('Неверный ввод, повторите')
-                except (ValueError, KeyboardInterrupt) as e:
-                    self.logger.debug(f"Ошибка ввода при полном копировании: {type(e).__name__}")
-                    self.logger.warning('Неверный ввод, повторите')
+                files_detected.append("[info]• Servers.ini[/info]")
+            header = "Обнаружены конфигурационные файлы:\n" + "\n".join(files_detected)
+            panel = Panel(
+                f"{header}\n\n" + "\n".join(items),
+                title="[menu.title]Параметры полного копирования[/menu.title]",
+                border_style="menu.title",
+            )
+            self.console.print(panel)
+            choices = ["0", "1", "2", "3", "4", "5"]
+            answer = Prompt.ask("Ваш выбор", choices=choices, default="0")
+            choice = int(answer)
+            mapping = {
+                0: -1,
+                1: self.ACTION_FULL_COPY_IGNORE,
+                2: self.ACTION_FULL_COPY_KEEP_PRIMA,
+                3: self.ACTION_FULL_COPY_KEEP_SERVERS,
+                4: self.ACTION_FULL_COPY_KEEP_BOTH,
+                5: self.ACTION_FULL_COPY_OVERWRITE_ALL,
+            }
+            result = mapping.get(choice, -1)
+            self.logger.debug("Вариант полного копирования: %s", result)
+            return result
         else:
-            print('Конфигурационные файлы PRIMA.ini и Servers.ini не найдены.')
-            print('Выберите вариант:')
-            print('  [1] Полное копирование (переписать все)')
-            print('  [0] Назад')
-            print()
-            
-            while True:
-                try:
-                    answer = input('Выберите действие: ')
-                    if answer.isdecimal():
-                        choice = int(answer)
-                        if choice == 0:
-                            return -1
-                        if choice == 1:
-                            return self.ACTION_FULL_COPY_OVERWRITE_ALL
-                    self.logger.debug(f"Неверный ввод при выборе полного копирования: '{answer}'")
-                    self.logger.warning('Неверный ввод, повторите')
-                except (ValueError, KeyboardInterrupt) as e:
-                    self.logger.debug(f"Ошибка ввода при полном копировании: {type(e).__name__}")
-                    self.logger.warning('Неверный ввод, повторите')
+            panel = Panel(
+                "[info]Файлы PRIMA.ini и Servers.ini не найдены в целевой директории.[/info]\n\n"
+                "[menu.hotkey][1][/menu.hotkey] Полное копирование (переписать всё)\n"
+                "[menu.hotkey][0][/menu.hotkey] Назад",
+                title="[menu.title]Параметры полного копирования[/menu.title]",
+                border_style="menu.title",
+            )
+            self.console.print(panel)
+            answer = Prompt.ask("Ваш выбор", choices=["0", "1"], default="0")
+            choice = int(answer)
+            mapping = {
+                0: -1,
+                1: self.ACTION_FULL_COPY_OVERWRITE_ALL,
+            }
+            result = mapping.get(choice, -1)
+            self.logger.debug("Вариант полного копирования без ini-файлов: %s", result)
+            return result
     
     def confirm_full_copy_overwrite(self) -> bool:
         """Подтверждение для режима полного переписывания всех файлов."""
-        while True:
-            try:
-                answer = input('Переписать всю директорию без исключений? [Y/N]: ').strip().lower()
-                if answer in ('y', 'yes', 'д', 'да'):
-                    return True
-                if answer in ('n', 'no', 'н', 'нет'):
-                    return False
-                self.logger.debug(f"Неверный ввод при подтверждении: '{answer}'")
-                self.logger.warning('Введите Y или N')
-            except (ValueError, KeyboardInterrupt):
-                return False
+        result = Confirm.ask(
+            "Переписать всю директорию без исключений?", default=False, show_default=True
+        )
+        self.logger.debug("Подтверждение полного переписывания: %s", result)
+        return result
     
     def show_restore_filters(self, years: list[int] | None = None):
         """Отображает подменю фильтров для восстановления из бэкапа.
@@ -287,90 +248,64 @@ class UserInterface:
         - ('older_year', year:int)
         - None — если выбран 'Назад'
         """
-        while True:
-            print('\n' + '=' * 60)
-            print(' ' * 14 + 'ФИЛЬТРЫ ВОССТАНОВЛЕНИЯ')
-            print('=' * 60)
-            print()
-            print('💾 ВОССТАНОВЛЕНИЕ:')
-            print('  [1] Текущий месяц')
-            print('  [2] Текущий год')
-            print('  [3] Старше')
-            print()
-            print('  [0] Назад')
-            print()
-            print('=' * 60)
-            print()
-            
-            try:
-                answer = input('Выберите фильтр: ')
-                if answer.isdecimal():
-                    choice = int(answer)
-                    if choice == 0:
-                        self.logger.debug("Фильтр восстановления: Назад (в главное меню)")
-                        return None
-                    if choice == 1:
-                        self.logger.debug("Фильтр восстановления: Текущий месяц")
-                        return ('current_month', None)
-                    if choice == 2:
-                        self.logger.debug("Фильтр восстановления: Текущий год")
-                        return ('current_year', None)
-                    if choice == 3:
-                        # Подменю выбора года для "Старше"
-                        res = self._show_restore_older_years(years or [])
-                        if res is None:
-                            # Назад из подменю годов — показать снова это меню
-                            continue
-                        return res
-                self.logger.debug(f"Неверный ввод при выборе фильтра восстановления: '{answer}'")
-                self.logger.warning('Неверный ввод, повторите')
-            except (ValueError, KeyboardInterrupt) as e:
-                self.logger.debug(f"Ошибка ввода при выборе фильтра восстановления: {type(e).__name__}")
-                self.logger.warning('Неверный ввод, повторите')
+        choices_panel = Panel(
+            "[menu.hotkey][1][/menu.hotkey] Текущий месяц\n"
+            "[menu.hotkey][2][/menu.hotkey] Текущий год\n"
+            "[menu.hotkey][3][/menu.hotkey] Старше\n\n"
+            "[menu.hotkey][0][/menu.hotkey] Назад",
+            title="[menu.title]Фильтры восстановления[/menu.title]",
+            border_style="menu.title",
+        )
+        self.console.print(choices_panel)
+        
+        choices = ["0", "1", "2", "3"]
+        answer = Prompt.ask("Ваш выбор", choices=choices, default="0")
+        choice = int(answer)
+        
+        if choice == 0:
+            self.logger.debug("Фильтр восстановления: Назад (в главное меню)")
+            return None
+        if choice == 1:
+            self.logger.debug("Фильтр восстановления: Текущий месяц")
+            return ('current_month', None)
+        if choice == 2:
+            self.logger.debug("Фильтр восстановления: Текущий год")
+            return ('current_year', None)
+        if choice == 3:
+            res = self._show_restore_older_years(years or [])
+            return res
+        return None
     
     def _show_restore_older_years(self, years: list[int]):
         """Подменю выбора года для фильтра 'Старше'."""
-        print('\n' + '=' * 60)
-        print(' ' * 10 + 'СТАРШЕ ТЕКУЩЕГО МЕСЯЦА — ВЫБОР ГОДА')
-        print('=' * 60)
-        print()
         if not years:
-            print('Нет бэкапов старше текущего месяца.')
-            print()
-            print('  [0] Назад')
-            print()
-            print('=' * 60)
-            while True:
-                answer = input('Нажмите 0 для возврата: ')
-                if answer == '0':
-                    return None
-                self.logger.warning('Неверный ввод, повторите')
+            panel = Panel(
+                "[warning]Нет бэкапов старше текущего месяца.[/warning]\n\n"
+                "[menu.hotkey][0][/menu.hotkey] Назад",
+                title="[menu.title]Старше текущего месяца[/menu.title]",
+                border_style="menu.title",
+            )
+            self.console.print(panel)
+            Prompt.ask("Нажмите 0 для возврата", choices=["0"], default="0")
+            return None
         
-        print('Выберите год:')
-        for idx, y in enumerate(years, 1):
-            print(f'  [{idx}] {y}')
-        print()
-        print('  [0] Назад')
-        print()
-        print('=' * 60)
-        print()
+        options = [f"[menu.hotkey][{idx}][/menu.hotkey] {year}" for idx, year in enumerate(years, 1)]
+        panel = Panel(
+            "\n".join(options) + "\n\n[menu.hotkey][0][/menu.hotkey] Назад",
+            title="[menu.title]Выберите год[/menu.title]",
+            border_style="menu.title",
+        )
+        self.console.print(panel)
         
-        while True:
-            try:
-                answer = input('Выберите год: ')
-                if answer.isdecimal():
-                    choice = int(answer)
-                    if choice == 0:
-                        return None
-                    if 1 <= choice <= len(years):
-                        year = years[choice - 1]
-                        self.logger.debug(f"Фильтр восстановления: Старше, год={year}")
-                        return ('older_year', year)
-                self.logger.debug(f"Неверный ввод при выборе года: '{answer}'")
-                self.logger.warning('Неверный ввод, повторите')
-            except (ValueError, KeyboardInterrupt) as e:
-                self.logger.debug(f"Ошибка ввода при выборе года: {type(e).__name__}")
-                self.logger.warning('Неверный ввод, повторите')
+        choices = ["0"] + [str(i) for i in range(1, len(years) + 1)]
+        answer = Prompt.ask("Ваш выбор", choices=choices, default="0")
+        choice = int(answer)
+        
+        if choice == 0:
+            return None
+        year = years[choice - 1]
+        self.logger.debug("Фильтр восстановления: Старше, год=%s", year)
+        return ('older_year', year)
 
     def update_shortcut(self, desktop_path: str, prima_exe_path: Union[str, Path]) -> bool:
         """Обновляет ярлык на рабочем столе с новой датой версии.
@@ -429,43 +364,42 @@ class UserInterface:
         """
         if not backups:
             self.logger.warning("Бэкапы не найдены для восстановления")
-            print('\n' + '=' * 60)
-            print(' ' * 16 + 'ДОСТУПНЫЕ БЭКАПЫ')
-            print('=' * 60)
-            print('\nБэкапы не найдены.')
-            print('\n  [0] Назад')
-            print('\n' + '=' * 60)
+            panel = Panel(
+                "[warning]Бэкапы не найдены.[/warning]\n\n[menu.hotkey][0][/menu.hotkey] Назад",
+                title="[menu.title]Доступные бэкапы[/menu.title]",
+                border_style="menu.title",
+            )
+            self.console.print(panel)
+            Prompt.ask("Нажмите 0 для возврата", choices=["0"], default="0")
             return -1
         
-        self.logger.info(f"Отображение списка бэкапов. Найдено бэкапов: {len(backups)}")
-        print('\n' + '=' * 60)
-        print(' ' * 16 + 'ДОСТУПНЫЕ БЭКАПЫ')
-        print('=' * 60)
-        print()
-        for i, backup in enumerate(backups, 1):
+        self.logger.info("Отображение списка бэкапов. Найдено бэкапов: %s", len(backups))
+        table = Table(
+            title="[menu.title]Доступные бэкапы[/menu.title]",
+            header_style="bold magenta",
+            expand=True,
+        )
+        table.add_column("#", justify="center", style="menu.hotkey", width=4)
+        table.add_column("Имя файла", style="menu.item", overflow="fold")
+        table.add_column("Дата создания", style="info", width=20, justify="center")
+        
+        for index, backup in enumerate(backups, 1):
             backup_time = datetime.fromtimestamp(backup.stat().st_mtime)
             backup_date = backup_time.strftime('%d.%m.%Y %H:%M')
-            print(f'  [{i}] {backup.name}  —  {backup_date}')
-        print()
-        print('  [0] Назад')
-        print()
-        print('=' * 60)
+            table.add_row(str(index), backup.name, backup_date)
+        table.add_row("0", "[dim]Отмена[/dim]", "[dim]-[/dim]")
         
-        while True:
-            try:
-                answer = input('Выберите бэкап для восстановления: ')
-                if answer.isdecimal():
-                    choice = int(answer)
-                    if choice == 0:
-                        self.logger.debug("Пользователь вернулся назад из списка бэкапов")
-                        return -1
-                    if 1 <= choice <= len(backups):
-                        selected_backup = backups[choice - 1]
-                        self.logger.debug(f"Пользователь выбрал бэкап для восстановления: {selected_backup.name}")
-                        return choice - 1
-                self.logger.debug(f"Неверный ввод при выборе бэкапа: '{answer}'")
-                self.logger.warning('Неверный ввод, повторите')
-            except (ValueError, KeyboardInterrupt) as e:
-                self.logger.debug(f"Ошибка ввода при выборе бэкапа: {type(e).__name__}")
-                self.logger.warning('Неверный ввод, повторите')
+        self.console.print(table)
+        
+        choices = ["0"] + [str(i) for i in range(1, len(backups) + 1)]
+        answer = Prompt.ask("Выберите бэкап", choices=choices, default="0")
+        choice = int(answer)
+        
+        if choice == 0:
+            self.logger.debug("Пользователь вернулся назад из списка бэкапов")
+            return -1
+        
+        selected_backup = backups[choice - 1]
+        self.logger.debug("Пользователь выбрал бэкап для восстановления: %s", selected_backup.name)
+        return choice - 1
 

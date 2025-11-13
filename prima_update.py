@@ -43,24 +43,23 @@ def main():
     ui = UserInterface(logger)
     ui.show_header()
     
-    # Проверка доступности сервера и валидация путей
-    logger.info("Проверка доступности сервера и валидация путей...")
-    if not validate_paths(config.server_directory, config.local_directory, logger):
-        error_msg = "Сервер недоступен или пути невалидны. Проверьте настройки."
-        logger.error(error_msg)
-        return
+    # Проверка доступности сервера, валидация путей, сравнение директорий
+    with ui.console.status("Проверка доступности сервера") as status:
+        if not validate_paths(config.server_directory, config.local_directory, logger):
+            error_msg = "Сервер недоступен или пути невалидны. Проверьте настройки."
+            logger.error(error_msg)
+            return
     
-    # Инициализация синхронизатора файлов
-    file_sync = FileSync(
-        config.server_directory,
-        config.local_directory,
-        config.ignore_list,
-        logger
-    )
-    
-    # Сравнение директорий
-    logger.info("Начало сравнения директорий...")
-    diff_files, only_files = file_sync.compare_directories()
+        # Инициализация синхронизатора файлов
+        file_sync = FileSync(
+            config.server_directory,
+            config.local_directory,
+            config.ignore_list,
+            logger
+        )   
+        # Сравнение директорий
+        status.update("Сравнение директорий") 
+        diff_files, only_files = file_sync.compare_directories()
     
     # Отображение найденных изменений
     ui.show_changes(diff_files, only_files)

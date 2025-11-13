@@ -11,9 +11,6 @@ except ImportError:
     print("pip install questionary")
     exit(1)
 
-from colorama import init
-init(autoreset=True)
-
 
 def demo_select_menu():
     """Демонстрация меню выбора."""
