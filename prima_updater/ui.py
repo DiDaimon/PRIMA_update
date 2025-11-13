@@ -55,7 +55,7 @@ class UserInterface:
         self.console.clear()
     
     def show_header(self):
-        """Отображает заголовок программы в панеле Rich."""
+        """Отображает заголовок программы в панели Rich."""
         self.clear_terminal()
         header_text = text2art('PRIMA - UPDATER', font='tarty1')
         panel = Panel(

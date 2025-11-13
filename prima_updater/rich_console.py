@@ -27,7 +27,7 @@ CUSTOM_THEME = Theme(
 
 @lru_cache(maxsize=1)
 def get_console(*, record: bool = False, log_path: Optional[str] = None) -> Console:
-    """Возвращает экземпляр Rich Console с преднастроенной темой.
+    """Возвращает экземпляр Rich Console с настроенной темой.
 
     Args:
         record: Включить запись вывода (используется RichHandler).

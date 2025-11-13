@@ -56,7 +56,7 @@ def check_server_availability(server_path: Union[str, Path], logger: logging.Log
 
 
 def validate_paths(server_path: Union[str, Path], local_path: Union[str, Path], logger: logging.Logger = None) -> bool:
-    """Валидирует пути сервера и локальной директории.
+    """Проверяет корректность пути сервера и локальной директории.
     
     Проверяет корректность путей и возможность работы с ними.
     

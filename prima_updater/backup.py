@@ -33,6 +33,7 @@ class BackupManager:
         self.logger = logger or logging.getLogger('PRIMA_Updater')
         self.prima_exe_name = self.prima_exe_path.name
     
+    @property
     def create_backup(self) -> Optional[Path]:
         """Создает бэкап файла PRIMA.exe.
         

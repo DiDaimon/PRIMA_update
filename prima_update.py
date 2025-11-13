@@ -201,7 +201,7 @@ def main():
     # Для всех остальных действий создаем бэкап перед изменениями
     if choice != UserInterface.ACTION_SKIP:
         logger.info("Создание бэкапа перед обновлением...")
-        backup_result = backup_manager.create_backup()
+        backup_result = backup_manager.create_backup
         if backup_result:
             logger.debug(f"Бэкап создан: {backup_result.name}")
         backup_manager.cleanup_old_backups()
