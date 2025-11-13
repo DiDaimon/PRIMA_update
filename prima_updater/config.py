@@ -5,6 +5,7 @@
 Настройки хранятся в коде, а не в отдельном файле settings.ini.
 """
 
+import os
 from pathlib import Path
 
 
@@ -19,7 +20,7 @@ class Config:
     SERVER_DIRECTORY = r"\\tserver1\RSU\PRIMA"
     
     # Путь к локальной директории
-    LOCAL_DIRECTORY = r"D:\User\PRIMA_Updated"
+    LOCAL_DIRECTORY = os.getenv('PRIMA_DIR')
     
     # Список файлов и папок для игнорирования при синхронизации
     IGNORE_LIST = [
