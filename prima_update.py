@@ -10,6 +10,8 @@
 """
 
 from pathlib import Path
+import time
+import msvcrt  # Для немедленного отклика на нажатие клавиши (только Windows)
 
 def check_dependencies():
     """Проверка наличия необходимых зависимостей.
@@ -51,6 +53,27 @@ from prima_updater import (
     UserInterface
 )
 
+def wait_for_key_or_timeout(ui, timeout: int = 2) -> bool:
+    """Ожидает нажатие клавиши или истечения времени.
+
+    Args:
+        ui: Настроенный UserInterface
+        timeout: Время ожидания в секундах.
+
+    Returns:
+        True, если была нажата клавиша, иначе False.
+    """
+    with ui.console.status(f"Ожидание нажатия клавиши {timeout} сек.") as status:
+        for i in range(timeout * 10):  # Проверка каждые 100 мс
+            if msvcrt.kbhit():  # Если нажата клавиша
+                msvcrt.getch()  # Считываем, чтобы очистить буфер
+                print()  # Перевод строки после ввода
+                return True
+            time.sleep(0.1)
+            status.update(f"Ожидание нажатия клавиши ({timeout - i // 10} сек.)")
+    print("\r" + " " * 60)  # Очистка строки
+    return False
+
 
 def main():
     """Главная функция программы.
@@ -76,7 +99,7 @@ def main():
     ui.show_header()
     
     # Проверка доступности сервера, валидация путей, сравнение директорий
-    with ui.console.status("Проверка доступности сервера") as status:
+    with ui.console.status("Проверка доступности сервера\n") as status:
         if not validate_paths(config.server_directory, config.local_directory, logger):
             error_msg = "Сервер недоступен или пути невалидны. Проверьте настройки."
             logger.error(error_msg)
@@ -95,14 +118,98 @@ def main():
     
     # Отображение найденных изменений
     ui.show_changes(diff_files, only_files)
-    
-    # Если изменений нет, просто обновляем ярлык и выходим
+
+    # Если изменений нет — показать возможность открыть меню
     if not diff_files and not only_files:
-        logger.info("Изменений не обнаружено. Обновление ярлыка и завершение работы.")
+        logger.info("Изменений не обнаружено.")
+
         prima_exe_path = config.get_prima_exe_path()
         if prima_exe_path.exists():
             ui.update_shortcut(config.desktop_path, prima_exe_path)
-        return
+            logger.debug("Ярлык обновлён (если изменилась дата).")
+        else:
+            logger.warning(f"PRIMA.exe не найден: {prima_exe_path}")
+
+        # Даём шанс пользователю открыть меню
+        if wait_for_key_or_timeout(ui, timeout=2):
+            logger.info("Пользователь нажал клавишу — открываем меню.")
+            # Переход к логике меню (аналогично случаю с изменениями)
+            backup_manager = BackupManager(prima_exe_path, config.backups_directory, logger)
+            backups = backup_manager.get_all_backups()
+            has_backups = len(backups) > 0
+            if has_backups:
+                logger.info(f"Найдено бэкапов: {len(backups)}")
+            else:
+                logger.debug("Бэкапов не найдено.")
+
+            while True:
+                choice = ui.show_menu()
+                logger.info(f"Пользователь выбрал в меню (из ожидания): {choice}")
+
+                if choice == UserInterface.ACTION_RESTORE_BACKUP:
+                    if not has_backups:
+                        logger.warning("Выбрано восстановление, но бэкапов нет.")
+                        ui.console.print("[yellow]Нет доступных бэкапов для восстановления.[/]")
+                        continue
+
+                    from datetime import datetime, timedelta
+                    now = datetime.now()
+                    first_day_current_month = datetime(now.year, now.month, 1)
+                    while True:
+                        older_years = sorted(
+                            {b.stat().st_mtime for b in backups},
+                            key=lambda t: datetime.fromtimestamp(t).year,
+                            reverse=True
+                        )
+                        older_years = [datetime.fromtimestamp(t).year for t in older_years if datetime.fromtimestamp(t).year < now.year]
+
+                        selected_filter = ui.show_restore_filters(older_years)
+                        if selected_filter is None:
+                            logger.info("Отмена выбора фильтра восстановления")
+                            break
+
+                        filter_key, filter_arg = selected_filter
+                        filtered_backups = []
+                        if filter_key == 'current_month':
+                            filtered_backups = [b for b in backups if datetime.fromtimestamp(b.stat().st_mtime) >= first_day_current_month]
+                        elif filter_key == 'current_year':
+                            first_day_current_year = datetime(now.year, 1, 1)
+                            filtered_backups = [b for b in backups if datetime.fromtimestamp(b.stat().st_mtime) >= first_day_current_year]
+                        elif filter_key == 'older_year':
+                            year = int(filter_arg)
+                            def is_match(bpath):
+                                ts = datetime.fromtimestamp(bpath.stat().st_mtime)
+                                if ts.year != year:
+                                    return False
+                                if year == now.year:
+                                    return ts < first_day_current_month
+                                return True
+                            filtered_backups = [b for b in backups if is_match(b)]
+                        else:
+                            filtered_backups = backups[:]
+
+                        if not filtered_backups:
+                            logger.info("Бэкапы по фильтру не найдены")
+                            continue
+
+                        backup_index = ui.show_backup_list(filtered_backups)
+                        if backup_index >= 0:
+                            backup_path = filtered_backups[backup_index]
+                            logger.info(f"Восстановление из бэкапа: {backup_path.name}")
+                            if backup_manager.restore_from_backup(backup_path):
+                                logger.info("Восстановление успешно")
+                                ui.update_shortcut(config.desktop_path, prima_exe_path)
+                            else:
+                                logger.error("Ошибка при восстановлении")
+                            return
+                        else:
+                            continue
+                else:
+                    logger.info("Пользователь выбрал другое действие. Завершение.")
+                    return
+        else:
+            logger.info("Таймер истёк. Завершение работы.")
+            return
     
     # Инициализация менеджера бэкапов
     prima_exe_path = config.get_prima_exe_path()
