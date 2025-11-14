@@ -10,6 +10,38 @@
 """
 
 from pathlib import Path
+
+def check_dependencies():
+    """Проверка наличия необходимых зависимостей.
+
+    Returns:
+        bool - True если все зависимости установлены, False иначе.
+    """
+    try:
+        import art
+        import rich
+        return True
+    except ImportError as e:
+        print("="*60)
+        print("Ошибка: Не установлены необходимые зависимости.")
+        print("="*60)
+        print("Отсутствует модуль:", e.name)
+        print("Попытка установить необходимые модули...")
+        from prima_updater import install
+        if install.setup():
+            print("="*60)
+            print("Все необходимые модули успешно установлены.")
+            print("="*60)
+            return True
+        else:
+            return False
+
+if not check_dependencies():
+    print("="*60)
+    print("Не удалось установить необходимые модули.")
+    print("="*60)
+
+
 from prima_updater import (
     Config,
     setup_logging,
