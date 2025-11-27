@@ -35,10 +35,25 @@ if not exist "%PYTHON%" (
         timeout /t 15 >nul
         exit /b 1
     )
-
     echo [SUCCESS] Виртуальное окружение создано.
+
+    :: Установка зависимостей из requirements.txt
+    echo [INFO] Установка зависимостей...
+    %PYTHON% -m pip install -r requirements.txt
+
+    if %errorlevel% neq 0 (
+        echo [ERROR] Не удалось установить зависимости.
+        timeout /t 15 >nul
+        exit /b 1
+    )
+    echo [SUCCESS] Зависимости установлены.
 )
 %PYTHON% prima_update.py %*
+if %errorlevel% neq 0 (
+    echo [ERROR] Скрипт prima_update.py завершился с ошибкой. Выполнение прервано.
+    timeout /t 15 >nul
+    exit /b 1
+)
 
 :: Запуск PRIMA
 if exist %PRIMA_EXE% (
