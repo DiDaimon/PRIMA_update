@@ -28,20 +28,13 @@ def check_dependencies():
         print("Ошибка: Не установлены необходимые зависимости.")
         print("="*60)
         print("Отсутствует модуль:", e.name)
-        print("Попытка установить необходимые модули...")
-        from prima_updater import install
-        if install.setup():
-            print("="*60)
-            print("Все необходимые модули успешно установлены.")
-            print("="*60)
-            return True
-        else:
-            return False
+        return False
 
 if not check_dependencies():
     print("="*60)
-    print("Не удалось установить необходимые модули.")
+    print("удалите папку .venv и запустите скрипт заново")
     print("="*60)
+    exit(1)
 
 
 from prima_updater import (
@@ -96,6 +89,7 @@ def main():
     
     # Инициализация пользовательского интерфейса
     ui = UserInterface(logger)
+    ui.clear_terminal()
     ui.show_header()
     
     # Проверка доступности сервера, валидация путей, сравнение директорий
