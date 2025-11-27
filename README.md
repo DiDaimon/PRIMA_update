@@ -27,7 +27,14 @@ PRIMA Updater - это утилита для синхронизации лока
 
 ### 1. Установка Python
 
-Если Python не установлен, скачайте его с [python.org](https://www.python.org/downloads/)
+Если Python не установлен, скачайте его с [python.org](https://www.python.org/downloads/) и установите.
+> Рекомендуется  Python 3.11.x
+
+Для настройки работы pip через прокси-сервер выполните команды в консоли:
+
+```bash
+pip config set global.proxy http://user:password@proxy:port
+```
 
 ### 2. Установка Git
 
@@ -35,7 +42,12 @@ PRIMA Updater - это утилита для синхронизации лока
 
 После установки Git будет доступен в командной строке и PowerShell.
 
-### 3. Клонирование репозитория
+Для настройки работы git через прокси-сервер выполните команды в консоли:
+
+```bash
+git config --global http.proxy http://user:password@proxy:port
+git config --global https.proxy https://user:password@proxy:port
+```
 
 ### 2. Клонирование репозитория
 
@@ -57,8 +69,7 @@ prima_update.bat
 Скрипт установки:
 - Проверит наличие Python и pip
 - Установит все необходимые зависимости из `requirements.txt`
-- Поддерживает установку через прокси-сервер при необходимости
-- Создаст ярлык на рабочем столе (опционально)
+- Создаст ярлык на рабочем столе
 
 #### Ручная установка
 
