@@ -309,6 +309,7 @@ class UserInterface:
 
     def update_shortcut(self, desktop_path: str, prima_exe_path: Union[str, Path]) -> bool:
         """Обновляет ярлык на рабочем столе с новой датой версии.
+        Если ярлык не найден, копирует шаблонный из assets.
         
         Args:
             desktop_path (str): Путь к рабочему столу
@@ -347,7 +348,13 @@ class UserInterface:
                     return True
             
             self.logger.warning("Ярлык на рабочем столе не найден")
-            return False
+            assets_path = Path(__file__).parent / 'assets' / '[PRIMA] 00.00.00.lnk'
+            if not assets_path.exists():
+                self.logger.error(f"Шаблонный ярлык не найден: {assets_path}")
+                return False
+            assets_path.rename(desktop_path_obj / f'[PRIMA] {new_date}.lnk')
+            self.logger.info(f"Создан ярлык на рабочем столе: [PRIMA] {new_date}")
+            return True
             
         except Exception as e:
             self.logger.error(f"Ошибка при обновлении ярлыка: {e}")
