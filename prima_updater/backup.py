@@ -24,12 +24,14 @@ class BackupManager:
         
         Args:
             prima_exe_path (Union[str, Path]): Полный путь к файлу PRIMA.exe
-            backup_directory (Union[str, Path], optional): Директория для хранения бэкапов.
-                                            Если None, используется та же директория, что и PRIMA.exe
+            backup_directory (Union[str, Path], optional): Директория для хранения бэкапов. Если ее нет создается.
             logger (logging.Logger, optional): Логгер для записи сообщений
         """
         self.prima_exe_path = Path(prima_exe_path)
-        self.backup_directory = Path(backup_directory) if backup_directory else self.prima_exe_path.parent
+
+        self.backup_directory = Path(backup_directory)
+        self.backup_directory.mkdir(parents=True, exist_ok=True)
+
         self.logger = logger or logging.getLogger('PRIMA_Updater')
         self.prima_exe_name = self.prima_exe_path.name
     
